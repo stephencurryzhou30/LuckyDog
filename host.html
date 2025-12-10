@@ -32,27 +32,41 @@
         const qrContainer = document.getElementById("qrcode");
         const ipInput = document.getElementById("ipInput");
         const urlDisplay = document.getElementById("urlDisplay");
-        let qrCodeObj = null;
+        const ipContainer = document.querySelector(".qr-card > div:first-child"); // Container for the input
 
-        // Try to guess a good default IP
-        // If we are on localhost, try to warn or leave empty
+        // Helper to check if we are on a local network
         const hostname = window.location.hostname;
-        if (hostname && hostname !== '127.0.0.1' && hostname !== 'localhost' && !hostname.startsWith('file')) {
+        const isLocal = hostname === '127.0.0.1' ||
+            hostname === 'localhost' ||
+            hostname.startsWith('192.168.') ||
+            hostname.startsWith('10.') ||
+            hostname.startsWith('172.');
+
+        // Initialize based on environment
+        if (!isLocal && hostname && !hostname.startsWith('file')) {
+            // We are on a public domain (like GitHub), hide the IP manual input to avoid confusion
+            if (ipContainer) ipContainer.style.display = 'none';
             ipInput.value = hostname;
+
+            // Also hide the wifi instruction since it's not relevant for public web
+            const wifiInstruction = document.querySelector(".instruction");
+            if (wifiInstruction) wifiInstruction.style.display = 'none';
         } else {
-            ipInput.value = "127.0.0.1";
+            // Local environment, show input
+            if (hostname && hostname !== '127.0.0.1' && hostname !== 'localhost') {
+                ipInput.value = hostname;
+            } else {
+                ipInput.value = "127.0.0.1";
+            }
         }
 
         function updateQR() {
             const ip = ipInput.value.trim() || window.location.hostname;
             const port = window.location.port ? ':' + window.location.port : '';
-            // Construct URL: http://<IP>:<PORT>/play.html
+            // Construct URL
             const playUrl = `${window.location.protocol}//${ip}${port}/play.html`;
 
-            // Clear previous QR
             qrContainer.innerHTML = "";
-
-            // Generate New QR
             new QRCode(qrContainer, {
                 text: playUrl,
                 width: 250,
@@ -61,11 +75,9 @@
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
-
             urlDisplay.textContent = playUrl;
         }
 
-        // Initialize
         updateQR();
     </script>
 </body>
