@@ -78,9 +78,40 @@
 
         if (roomId) {
             mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-            mqttClient.on('connect', () => { console.log('MQTT Connected'); });
+            mqttClient.on('connect', () => {
+                console.log('MQTT Connected');
+                // Subscribe to Reset Signal
+                mqttClient.subscribe(`luckydraw/${roomId}/reset`);
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                if (topic.includes('reset')) {
+                    console.log("Reset signal received!");
+                    resetLocalState();
+                }
+            });
         } else {
             console.warn("No room ID found in URL");
+        }
+
+        function resetLocalState() {
+            // Clear storage
+            localStorage.removeItem('drawHistory');
+
+            // Reset UI
+            drawBtn.disabled = false;
+            drawBtn.classList.remove('disabled');
+            drawBtn.innerHTML = "点我<br>抽奖";
+            userNameInput.style.display = 'block';
+            userNameInput.value = '';
+
+            const instruction = document.querySelector('.instruction');
+            instruction.innerHTML = '每人仅限一次，祝您好运！';
+
+            alert("主持人开启了新一轮抽奖！您可以再来一次了！");
+
+            // Close modal if open
+            modalOverlay.classList.remove('show');
         }
 
         // Check if already played
