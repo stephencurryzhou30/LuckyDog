@@ -127,37 +127,59 @@
         const winnerList = document.getElementById("winnerList");
         const statusDot = document.getElementById("statusDot");
 
+        // Load winners from local storage on startup
+        loadWinners();
+
         // Generate a random Room ID for this session
-        const roomId = 'room_' + Math.random().toString(36).substr(2, 9);
+        // CHECK if we already have a room ID to persist the session? 
+        // Actually, for a refresh to work and keep the same QR code valid, we should probably persist the Room ID too!
+        // Otherwise refreshing changes the room ID and disconects old QR codes.
+        let roomId = localStorage.getItem('hostRoomId');
+        if (!roomId) {
+            roomId = 'room_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('hostRoomId', roomId);
+        }
         console.log("Current Room ID:", roomId);
 
         // Connect to Public MQTT Broker (WebSockets)
-        // Using EMQX public broker
         const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
         client.on('connect', function () {
             statusDot.style.background = '#00ff00'; // Green
             console.log('Connected to MQTT');
-            // Subscribe to our specific room topic
-            client.subscribe(`luckydraw/${roomId}/newWinner`, function (err) {
-                if (!err) {
-                    console.log('Subscribed to room topic');
-                }
-            });
+            client.subscribe(`luckydraw/${roomId}/newWinner`);
         });
 
         client.on('message', function (topic, message) {
-            // message is Buffer
             try {
                 const data = JSON.parse(message.toString());
-                addWinner(data.name, data.prize);
+                // Save and Add
+                saveWinner(data.name, data.prize);
+                addWinnerToUI(data.name, data.prize);
             } catch (e) {
                 console.error("Parse error", e);
             }
         });
 
-        function addWinner(name, prize) {
-            // Remove "Waiting..." placeholder if exists
+        function saveWinner(name, prize) {
+            let winners = JSON.parse(localStorage.getItem('hostWinners') || '[]');
+            // Avoid duplicates if message received twice (optional, but good practice)
+            // But here users might legitimate win same thing? No, one user one prize.
+            // Let's just push.
+            winners.unshift({ name, prize }); // Add to top
+            localStorage.setItem('hostWinners', JSON.stringify(winners));
+        }
+
+        function loadWinners() {
+            let winners = JSON.parse(localStorage.getItem('hostWinners') || '[]');
+            if (winners.length > 0) {
+                winnerList.innerHTML = ''; // Clear placeholder
+                winners.forEach(w => addWinnerToUI(w.name, w.prize, false)); // false = don't animate old ones? or just animate all
+            }
+        }
+
+        function addWinnerToUI(name, prize) {
+            // Remove placeholder
             if (winnerList.children.length > 0 && winnerList.children[0].tagName === 'P') {
                 winnerList.innerHTML = '';
             }
@@ -168,17 +190,17 @@
                 <span class="winner-name">${name}</span>
                 <span class="winner-prize">${prize}</span>
             `;
-            // Insert at top
             winnerList.insertBefore(item, winnerList.firstChild);
         }
 
         function resetRound() {
             if (!confirm("确定要开启新一轮抽奖吗？\n所有人的手机将被重置，可以再次抽奖。")) return;
 
-            // 1. Clear Host UI
+            // 1. Clear Host UI & Storage
             winnerList.innerHTML = '<p style="text-align:center; color:#999; font-size:0.8rem;">等待抽奖...</p>';
+            localStorage.removeItem('hostWinners');
 
-            // 2. Send Reset Signal via MQTT
+            // 2. Send Reset Signal
             if (client.connected) {
                 client.publish(`luckydraw/${roomId}/reset`, 'true');
                 alert("已发送重置信号！大家可以重新扫码/刷新抽奖了。");
