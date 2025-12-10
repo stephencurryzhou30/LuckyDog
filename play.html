@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幸运大抽奖</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>✨ 幸运大转盘 ✨</h1>
+
+        <div class="draw-btn-container">
+            <button id="drawBtn" class="draw-btn">点我<br>抽奖</button>
+        </div>
+
+        <p class="instruction">祝您好运连连！</p>
+    </div>
+
+    <!-- Result Modal -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal">
+            <div class="prize-title">恭喜您获得</div>
+            <div id="prizeName" class="prize-name">特等奖</div>
+            <button class="close-btn" onclick="closeModal()">开心收下</button>
+        </div>
+    </div>
+
+    <script>
+        const prizes = [
+            { name: "特等奖：新款手机", weight: 0.05 },
+            { name: "一等奖：平板电脑", weight: 0.1 },
+            { name: "二等奖：蓝牙耳机", weight: 0.2 },
+            { name: "三等奖：精美玩偶", weight: 0.3 },
+            { name: "幸运奖：代金券", weight: 0.35 }
+        ];
+
+        const drawBtn = document.getElementById('drawBtn');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const prizeNameEl = document.getElementById('prizeName');
+
+        function getRandomPrize() {
+            const rand = Math.random();
+            let accumulatedWeight = 0;
+            for (const prize of prizes) {
+                accumulatedWeight += prize.weight;
+                if (rand < accumulatedWeight) {
+                    return prize.name;
+                }
+            }
+            return prizes[prizes.length - 1].name;
+        }
+
+        function fireConfetti() {
+            var count = 200;
+            var defaults = {
+                origin: { y: 0.7 }
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        }
+
+        drawBtn.addEventListener('click', () => {
+            // Disable button during animation
+            drawBtn.disabled = true;
+            drawBtn.classList.add('disabled');
+            drawBtn.innerHTML = "抽奖中...";
+
+            // Simulate network/spinning delay
+            setTimeout(() => {
+                const prize = getRandomPrize();
+                prizeNameEl.textContent = prize;
+
+                // Show Result
+                modalOverlay.classList.add('show');
+                fireConfetti();
+
+                // Reset button text
+                drawBtn.innerHTML = "点我<br>抽奖";
+            }, 2000); // 2 second delay
+        });
+
+        function closeModal() {
+            modalOverlay.classList.remove('show');
+            drawBtn.disabled = false;
+            drawBtn.classList.remove('disabled');
+        }
+    </script>
+</body>
+
+</html>

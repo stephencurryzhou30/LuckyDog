@@ -1,0 +1,173 @@
+:root {
+    --primary-red: #A30000;
+    --dark-red: #590000;
+    --gold: #FFD700;
+    --gold-gradient: linear-gradient(135deg, #FFD700 0%, #FDB931 100%);
+    --text-white: #FFFFFF;
+    --bg-color: #2c0e0e;
+    --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: var(--bg-color);
+    background-image: radial-gradient(circle at center, var(--primary-red) 0%, var(--bg-color) 100%);
+    color: var(--text-white);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-x: hidden;
+}
+
+.container {
+    width: 100%;
+    max-width: 480px;
+    padding: 20px;
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--gold);
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    margin-bottom: 30px;
+    font-weight: 800;
+}
+
+/* Host Page Styles */
+.qr-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 40px;
+    border-radius: 20px;
+    border: 1px solid var(--gold);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.qr-placeholder {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    display: inline-block;
+    margin: 20px auto;
+}
+
+.instruction {
+    font-size: 1.2rem;
+    color: #ddd;
+    margin-top: 20px;
+}
+
+/* Play Page Styles */
+.draw-btn-container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+}
+
+.draw-btn {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--gold-gradient);
+    border: none;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--dark-red);
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.5);
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: pulse 2s infinite;
+}
+
+.draw-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.draw-btn.disabled {
+    pointer-events: none;
+    filter: grayscale(0.8);
+    animation: none;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
+    50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(255, 215, 0, 0.8); }
+    100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
+}
+
+/* Result Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 1000;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal {
+    background: white;
+    color: var(--primary-red);
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 90%;
+    transform: scale(0.7);
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 4px solid var(--gold);
+}
+
+.modal-overlay.show .modal {
+    transform: scale(1);
+}
+
+.prize-title {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #666;
+}
+
+.prize-name {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--primary-red);
+    margin-bottom: 30px;
+}
+
+.close-btn {
+    background: var(--primary-red);
+    color: white;
+    border: none;
+    padding: 10px 30px;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    cursor: pointer;
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+    h1 { font-size: 2rem; }
+    .draw-btn-container { width: 180px; height: 180px; }
+}
