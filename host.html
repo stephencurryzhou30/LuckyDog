@@ -32,7 +32,7 @@
         const qrContainer = document.getElementById("qrcode");
         const ipInput = document.getElementById("ipInput");
         const urlDisplay = document.getElementById("urlDisplay");
-        const ipContainer = document.querySelector(".qr-card > div:first-child"); // Container for the input
+        const ipContainer = document.querySelector(".qr-card > div:first-child");
 
         // Helper to check if we are on a local network
         const hostname = window.location.hostname;
@@ -44,15 +44,15 @@
 
         // Initialize based on environment
         if (!isLocal && hostname && !hostname.startsWith('file')) {
-            // We are on a public domain (like GitHub), hide the IP manual input to avoid confusion
+            // Public domain (GitHub): hide IP input
             if (ipContainer) ipContainer.style.display = 'none';
             ipInput.value = hostname;
 
-            // Also hide the wifi instruction since it's not relevant for public web
+            // Hide wifi instruction
             const wifiInstruction = document.querySelector(".instruction");
             if (wifiInstruction) wifiInstruction.style.display = 'none';
         } else {
-            // Local environment, show input
+            // Local environment
             if (hostname && hostname !== '127.0.0.1' && hostname !== 'localhost') {
                 ipInput.value = hostname;
             } else {
@@ -61,10 +61,31 @@
         }
 
         function updateQR() {
+            // Get current path but remove 'host.html' or 'index.html' or trailing slash
+            // This is CRITICAL for GitHub Pages which sits in a subdirectory (the repo name)
+            let path = window.location.pathname;
+            path = path.replace('/host.html', '').replace('/index.html', '');
+            if (path.endsWith('/')) {
+                path = path.slice(0, -1);
+            }
+
             const ip = ipInput.value.trim() || window.location.hostname;
             const port = window.location.port ? ':' + window.location.port : '';
-            // Construct URL
-            const playUrl = `${window.location.protocol}//${ip}${port}/play.html`;
+            const protocol = window.location.protocol;
+
+            let playUrl;
+            if (!isLocal && hostname && !hostname.startsWith('file')) {
+                // Public domain: keep the path (repo name)
+                playUrl = `${protocol}//${hostname}${path}/play.html`;
+            } else {
+                // Local logic: usually root or simple path
+                // Note: If local logic has weird pathing, we trust ipInput mainly for hostname
+                // But for simplicity on local we often assume root if using IP
+                // To be safe, let's include path if it's not just root
+                playUrl = `${protocol}//${ip}${port}${path}/play.html`;
+            }
+
+            console.log("Generated URL:", playUrl);
 
             qrContainer.innerHTML = "";
             new QRCode(qrContainer, {
