@@ -111,6 +111,10 @@
                 <div id="winnerList">
                     <p style="text-align:center; color:#999; font-size:0.8rem;">等待抽奖...</p>
                 </div>
+                <button onclick="resetRound()"
+                    style="width:100%; margin-top:10px; padding:10px; background:rgba(255,0,0,0.5); border:1px solid red; color:white; border-radius:5px; cursor:pointer;">
+                    🔄 开启新一轮 (清空记录)
+                </button>
             </div>
         </div>
     </div>
@@ -166,6 +170,21 @@
             `;
             // Insert at top
             winnerList.insertBefore(item, winnerList.firstChild);
+        }
+
+        function resetRound() {
+            if (!confirm("确定要开启新一轮抽奖吗？\n所有人的手机将被重置，可以再次抽奖。")) return;
+
+            // 1. Clear Host UI
+            winnerList.innerHTML = '<p style="text-align:center; color:#999; font-size:0.8rem;">等待抽奖...</p>';
+
+            // 2. Send Reset Signal via MQTT
+            if (client.connected) {
+                client.publish(`luckydraw/${roomId}/reset`, 'true');
+                alert("已发送重置信号！大家可以重新扫码/刷新抽奖了。");
+            } else {
+                alert("网络未连接，无法发送重置信号。");
+            }
         }
 
         // --- QR Code Logic --- 
