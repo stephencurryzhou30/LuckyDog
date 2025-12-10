@@ -7,24 +7,111 @@
     <title>抽奖活动 - 主持人</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        .layout {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        .monitor-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--gold);
+            border-radius: 15px;
+            width: 300px;
+            height: 400px;
+            padding: 20px;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .monitor-title {
+            color: var(--gold);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        .winner-item {
+            background: rgba(255, 255, 255, 0.1);
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            animation: slideIn 0.5s ease;
+        }
+
+        .winner-name {
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .winner-prize {
+            color: var(--gold);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @media (max-width: 800px) {
+            .layout {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .monitor-panel {
+                width: 100%;
+                height: 300px;
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <div class="container">
+    <div class="container" style="max-width: 900px;">
         <h1>🎉 扫码参与抽奖</h1>
 
-        <div class="qr-card">
-            <div style="margin-bottom: 15px;">
-                <label for="ipInput" style="color:#ddd; font-size:0.9rem;">服务器 IP 地址:</label>
-                <input type="text" id="ipInput" value="" placeholder="例如 192.168.1.5"
-                    style="padding:5px; border-radius:5px; border:none; text-align:center; width: 150px;">
-                <button onclick="updateQR()"
-                    style="padding:5px 10px; cursor:pointer; background:var(--gold); border:none; border-radius:5px; font-weight:bold;">生成</button>
+        <div class="layout">
+            <!-- Left: QR Code -->
+            <div class="qr-card" style="flex: 1;">
+                <div style="margin-bottom: 15px;">
+                    <label for="ipInput" style="color:#ddd; font-size:0.9rem;">服务器 IP 地址:</label>
+                    <input type="text" id="ipInput" value="" placeholder="例如 192.168.1.5"
+                        style="padding:5px; border-radius:5px; border:none; text-align:center; width: 150px;">
+                    <button onclick="updateQR()"
+                        style="padding:5px 10px; cursor:pointer; background:var(--gold); border:none; border-radius:5px; font-weight:bold;">生成</button>
+                    <div id="statusDot"
+                        style="display:inline-block; width:10px; height:10px; background:red; border-radius:50%; margin-left:10px;"
+                        title="连接状态"></div>
+                </div>
+
+                <div id="qrcode" class="qr-placeholder"></div>
+                <p class="instruction">请确保手机和电脑连接同一 WiFi</p>
+                <p style="margin-top: 10px; font-size: 0.9rem; opacity: 0.7;">扫码地址: <span id="urlDisplay"></span></p>
             </div>
 
-            <div id="qrcode" class="qr-placeholder"></div>
-            <p class="instruction">请确保手机和电脑连接同一 WiFi</p>
-            <p style="margin-top: 10px; font-size: 0.9rem; opacity: 0.7;">扫码地址: <span id="urlDisplay"></span></p>
+            <!-- Right: Live Winners -->
+            <div class="monitor-panel">
+                <div class="monitor-title">🏆 实时中奖名单</div>
+                <div id="winnerList">
+                    <p style="text-align:center; color:#999; font-size:0.8rem;">等待抽奖...</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -33,8 +120,55 @@
         const ipInput = document.getElementById("ipInput");
         const urlDisplay = document.getElementById("urlDisplay");
         const ipContainer = document.querySelector(".qr-card > div:first-child");
+        const winnerList = document.getElementById("winnerList");
+        const statusDot = document.getElementById("statusDot");
 
-        // Helper to check if we are on a local network
+        // Generate a random Room ID for this session
+        const roomId = 'room_' + Math.random().toString(36).substr(2, 9);
+        console.log("Current Room ID:", roomId);
+
+        // Connect to Public MQTT Broker (WebSockets)
+        // Using EMQX public broker
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+        client.on('connect', function () {
+            statusDot.style.background = '#00ff00'; // Green
+            console.log('Connected to MQTT');
+            // Subscribe to our specific room topic
+            client.subscribe(`luckydraw/${roomId}/newWinner`, function (err) {
+                if (!err) {
+                    console.log('Subscribed to room topic');
+                }
+            });
+        });
+
+        client.on('message', function (topic, message) {
+            // message is Buffer
+            try {
+                const data = JSON.parse(message.toString());
+                addWinner(data.name, data.prize);
+            } catch (e) {
+                console.error("Parse error", e);
+            }
+        });
+
+        function addWinner(name, prize) {
+            // Remove "Waiting..." placeholder if exists
+            if (winnerList.children.length > 0 && winnerList.children[0].tagName === 'P') {
+                winnerList.innerHTML = '';
+            }
+
+            const item = document.createElement('div');
+            item.className = 'winner-item';
+            item.innerHTML = `
+                <span class="winner-name">${name}</span>
+                <span class="winner-prize">${prize}</span>
+            `;
+            // Insert at top
+            winnerList.insertBefore(item, winnerList.firstChild);
+        }
+
+        // --- QR Code Logic --- 
         const hostname = window.location.hostname;
         const isLocal = hostname === '127.0.0.1' ||
             hostname === 'localhost' ||
@@ -42,17 +176,12 @@
             hostname.startsWith('10.') ||
             hostname.startsWith('172.');
 
-        // Initialize based on environment
         if (!isLocal && hostname && !hostname.startsWith('file')) {
-            // Public domain (GitHub): hide IP input
             if (ipContainer) ipContainer.style.display = 'none';
             ipInput.value = hostname;
-
-            // Hide wifi instruction
             const wifiInstruction = document.querySelector(".instruction");
             if (wifiInstruction) wifiInstruction.style.display = 'none';
         } else {
-            // Local environment
             if (hostname && hostname !== '127.0.0.1' && hostname !== 'localhost') {
                 ipInput.value = hostname;
             } else {
@@ -61,8 +190,6 @@
         }
 
         function updateQR() {
-            // Get current path but remove 'host.html' or 'index.html' or trailing slash
-            // This is CRITICAL for GitHub Pages which sits in a subdirectory (the repo name)
             let path = window.location.pathname;
             path = path.replace('/host.html', '').replace('/index.html', '');
             if (path.endsWith('/')) {
@@ -75,14 +202,9 @@
 
             let playUrl;
             if (!isLocal && hostname && !hostname.startsWith('file')) {
-                // Public domain: keep the path (repo name)
-                playUrl = `${protocol}//${hostname}${path}/play.html`;
+                playUrl = `${protocol}//${hostname}${path}/play.html?room=${roomId}`;
             } else {
-                // Local logic: usually root or simple path
-                // Note: If local logic has weird pathing, we trust ipInput mainly for hostname
-                // But for simplicity on local we often assume root if using IP
-                // To be safe, let's include path if it's not just root
-                playUrl = `${protocol}//${ip}${port}${path}/play.html`;
+                playUrl = `${protocol}//${ip}${port}${path}/play.html?room=${roomId}`;
             }
 
             console.log("Generated URL:", playUrl);

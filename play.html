@@ -4,26 +4,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>幸运大抽奖</title>
+    <title> 幸运大抽奖</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .name-input {
+            padding: 10px;
+            font-size: 1.1rem;
+            border-radius: 5px;
+            border: 2px solid var(--gold);
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            width: 80%;
+            text-align: center;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
         <h1>✨ 幸运大转盘 ✨</h1>
 
+        <!-- Name Input Section -->
+        <div class="input-group">
+            <input type="text" id="userName" class="name-input" placeholder="请输入您的姓名" maxlength="10">
+        </div>
+
         <div class="draw-btn-container">
             <button id="drawBtn" class="draw-btn">点我<br>抽奖</button>
         </div>
 
-        <p class="instruction">祝您好运连连！</p>
+        <p class="instruction">每人仅限一次，祝您好运！</p>
     </div>
 
     <!-- Result Modal -->
     <div id="modalOverlay" class="modal-overlay">
         <div class="modal">
-            <div class="prize-title">恭喜您获得</div>
+            <div class="prize-title">恭喜 <span id="winnerName"></span> 获得</div>
             <div id="prizeName" class="prize-name">特等奖</div>
             <button class="close-btn" onclick="closeModal()">开心收下</button>
         </div>
@@ -41,6 +63,41 @@
         const drawBtn = document.getElementById('drawBtn');
         const modalOverlay = document.getElementById('modalOverlay');
         const prizeNameEl = document.getElementById('prizeName');
+        const userNameInput = document.getElementById('userName');
+        const winnerNameEl = document.getElementById('winnerName');
+
+        // MQTT Setup
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room'); // Get room from QR code
+        let mqttClient = null;
+
+        if (roomId) {
+            mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+            mqttClient.on('connect', () => { console.log('MQTT Connected'); });
+        } else {
+            console.warn("No room ID found in URL");
+        }
+
+        // Check if already played
+        checkPlayedStatus();
+
+        function checkPlayedStatus() {
+            const history = localStorage.getItem('drawHistory');
+            if (history) {
+                const data = JSON.parse(history);
+                lockState(data.prize);
+            }
+        }
+
+        function lockState(prizeName) {
+            drawBtn.disabled = true;
+            drawBtn.classList.add('disabled');
+            drawBtn.innerHTML = "已抽过";
+            userNameInput.style.display = 'none';
+
+            const instruction = document.querySelector('.instruction');
+            instruction.innerHTML = `您已获得：<span style="color:var(--gold)">${prizeName}</span>`;
+        }
 
         function getRandomPrize() {
             const rand = Math.random();
@@ -56,16 +113,12 @@
 
         function fireConfetti() {
             var count = 200;
-            var defaults = {
-                origin: { y: 0.7 }
-            };
-
+            var defaults = { origin: { y: 0.7 } };
             function fire(particleRatio, opts) {
                 confetti(Object.assign({}, defaults, opts, {
                     particleCount: Math.floor(count * particleRatio)
                 }));
             }
-
             fire(0.25, { spread: 26, startVelocity: 55 });
             fire(0.2, { spread: 60 });
             fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
@@ -74,29 +127,44 @@
         }
 
         drawBtn.addEventListener('click', () => {
-            // Disable button during animation
+            const name = userNameInput.value.trim();
+            if (!name) { alert("请先输入您的姓名！"); return; }
+            if (localStorage.getItem('drawHistory')) { alert("您已经抽过奖啦！"); return; }
+
             drawBtn.disabled = true;
             drawBtn.classList.add('disabled');
             drawBtn.innerHTML = "抽奖中...";
 
-            // Simulate network/spinning delay
             setTimeout(() => {
                 const prize = getRandomPrize();
                 prizeNameEl.textContent = prize;
+                winnerNameEl.textContent = name;
+
+                // Save Record
+                const record = { name: name, prize: prize, time: new Date().toISOString() };
+                localStorage.setItem('drawHistory', JSON.stringify(record));
+
+                // --- SYNC TO HOST ---
+                if (mqttClient && mqttClient.connected) {
+                    mqttClient.publish(`luckydraw/${roomId}/newWinner`, JSON.stringify({
+                        name: name,
+                        prize: prize
+                    }));
+                }
 
                 // Show Result
                 modalOverlay.classList.add('show');
                 fireConfetti();
-
-                // Reset button text
-                drawBtn.innerHTML = "点我<br>抽奖";
-            }, 2000); // 2 second delay
+            }, 2000);
         });
 
         function closeModal() {
             modalOverlay.classList.remove('show');
-            drawBtn.disabled = false;
-            drawBtn.classList.remove('disabled');
+            const history = localStorage.getItem('drawHistory');
+            if (history) {
+                const data = JSON.parse(history);
+                lockState(data.prize);
+            }
         }
     </script>
 </body>
